@@ -4,7 +4,7 @@ import pickle
 from utils import preprocess_input
 
 # Load model
-model = pickle.load(open('model/BEST_STACKED_MODEL_OPTUNA.pkl', 'rb'))
+model = pickle.load(open('model/CAT_model.pkl', 'rb'))
 
 # UI
 st.set_page_config(page_title="📈 Product Demand Forecasting", layout="wide")
@@ -41,7 +41,7 @@ if uploaded_file:
         st.error(f"⚠️ Error processing file: {e}")
 
 try:
-    model = pickle.load(open('model/BEST_STACKED_MODEL_OPTUNA.pkl','rb'))
+    model = pickle.load(open('model/CAT_model.pkl','rb'))
 except FileNotFoundError:
     st.error("Model file not found. Make sure it’s in the `model/` folder.")
     st.stop()
