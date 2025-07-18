@@ -39,3 +39,9 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"⚠️ Error processing file: {e}")
+
+try:
+    model = pickle.load(open('model/BEST_STACKED_MODEL_OPTUNA.pkl','rb'))
+except FileNotFoundError:
+    st.error("Model file not found. Make sure it’s in the `model/` folder.")
+    st.stop()
