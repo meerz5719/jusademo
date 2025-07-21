@@ -4,50 +4,89 @@ import numpy as np
 import pickle
 from utils import preprocess_input
 
-# Load CatBoost model
+# -- PAGE SETUP --
+st.set_page_config(page_title="🧠 Demand Forecasting App", layout="wide")
+st.title("📈 Product Demand Forecasting")
+st.markdown("Upload a CSV or manually enter values to predict **sales** using different models.")
+
+# -- MODEL SELECTION --
+st.sidebar.header("⚙️ Model Selection")
+model_choice = st.sidebar.selectbox("Choose a Model", ["CatBoost", "XGBoost", "Stacked Model"])
+
+model_path = {
+    "CatBoost": "model/CAT_model.pkl",
+    "XGBoost": "model/XGB_model.pkl",
+    "Stacked Model": "model/BEST_STACKED_MODEL_OPTUNA.pkl"
+}
+
 try:
-    model = pickle.load(open('model/CAT_model.pkl', 'rb'))
+    model = pickle.load(open(model_path[model_choice], "rb"))
 except FileNotFoundError:
-    st.error("Model file not found. Make sure it’s in the `model/` folder.")
+    st.error(f"❌ {model_choice} model file not found at `{model_path[model_choice]}`.")
     st.stop()
 
-# Page config
-st.set_page_config(page_title="📊 Manual Forecasting", layout="centered")
-st.title("🧮 Forecast Product Demand (Manual Input)")
+# -- TAB UI --
+tab1, tab2 = st.tabs(["📁 Upload CSV", "🖊️ Manual Entry"])
 
-# --- INPUT SECTION ---
-st.markdown("### 📥 Enter product & store details:")
+# === 📁 FILE UPLOAD MODE ===
+with tab1:
+    st.markdown("### Upload your product data (CSV):")
+    uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
-date = st.date_input("Date")
-family = st.selectbox("Product Family", ['BEVERAGES', 'GROCERY I', 'DAIRY', 'SEAFOOD', 'HOME AND KITCHEN I'])
-city = st.selectbox("City", ['QUITO', 'CUENCA', 'GUAYAQUIL', 'AMBATO'])
-holiday_type = st.selectbox("Holiday Type", ['Holiday', 'Additional', 'Event', 'Work Day', 'Transfer'])
-transactions = st.number_input("Number of Transactions", min_value=0, step=1)
-oil_price = st.number_input("Oil Price (dcoilwtico)", min_value=0.0, step=0.1)
+    if uploaded_file:
+        try:
+            input_df = pd.read_csv(uploaded_file)
+            st.subheader("📋 Raw Input")
+            st.dataframe(input_df.head())
 
-# --- PREPROCESS AND PREDICT ---
-if st.button("Predict Sales"):
-    try:
-        # Construct DataFrame
-        input_dict = {
-            'id': [1],
-            'date': [pd.to_datetime(date)],
-            'family': [family],
-            'city': [city],
-            'holiday_type': [holiday_type],
-            'transactions': [transactions],
-            'dcoilwtico': [oil_price]
-        }
-        input_df = pd.DataFrame(input_dict)
+            processed_df = preprocess_input(input_df)
+            st.subheader("⚙️ Preprocessed Input")
+            st.dataframe(processed_df.head())
 
-        st.subheader("🔎 Input Summary")
-        st.dataframe(input_df)
+            predictions = model.predict(processed_df)
+            input_df['Predicted Sales'] = predictions
 
-        # Preprocess and predict
-        processed_df = preprocess_input(input_df)
-        prediction = model.predict(processed_df)[0]
+            st.subheader("🔮 Predictions")
+            st.dataframe(input_df[['Predicted Sales']].head())
 
-        st.success(f"📈 Predicted Sales: **{prediction:.2f}** units")
+            # Download CSV
+            csv = input_df.to_csv(index=False).encode('utf-8')
+            st.download_button("⬇️ Download Predictions", csv, "predicted_output.csv", "text/csv")
 
-    except Exception as e:
-        st.error(f"⚠️ Prediction failed: {e}")
+        except Exception as e:
+            st.error(f"⚠️ Error processing file: {e}")
+
+# === 🖊️ MANUAL INPUT MODE ===
+with tab2:
+    st.markdown("### Manually enter product features:")
+
+    date = st.date_input("Date")
+    family = st.selectbox("Product Family", ['BEVERAGES', 'GROCERY I', 'DAIRY', 'SEAFOOD', 'HOME AND KITCHEN I'])
+    city = st.selectbox("City", ['QUITO', 'CUENCA', 'GUAYAQUIL', 'AMBATO'])
+    holiday_type = st.selectbox("Holiday Type", ['Holiday', 'Additional', 'Event', 'Work Day', 'Transfer'])
+    transactions = st.number_input("Number of Transactions", min_value=0, step=1)
+    oil_price = st.number_input("Oil Price (dcoilwtico)", min_value=0.0, step=0.1)
+
+    if st.button("🚀 Predict Sales"):
+        try:
+            input_dict = {
+                'id': [1],
+                'date': [pd.to_datetime(date)],
+                'family': [family],
+                'city': [city],
+                'holiday_type': [holiday_type],
+                'transactions': [transactions],
+                'dcoilwtico': [oil_price]
+            }
+            input_df = pd.DataFrame(input_dict)
+
+            st.subheader("🔍 Input Summary")
+            st.dataframe(input_df)
+
+            processed_df = preprocess_input(input_df)
+            prediction = model.predict(processed_df)[0]
+
+            st.success(f"📊 Predicted Sales ({model_choice}): **{prediction:.2f}** units")
+
+        except Exception as e:
+            st.error(f"⚠️ Prediction failed: {e}")
