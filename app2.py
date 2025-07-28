@@ -2,91 +2,54 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-from utils import preprocess_input
 
-# -- PAGE SETUP --
-st.set_page_config(page_title="🧠 Demand Forecasting App", layout="wide")
-st.title("📈 Product Demand Forecasting")
-st.markdown("Upload a CSV or manually enter values to predict **sales** using different models.")
+# Load the trained stacked model
+with open("best_stacked_model_optuna1.pkl", "rb") as f:
+    model = pickle.load(f)
 
-# -- MODEL SELECTION --
-st.sidebar.header("⚙️ Model Selection")
-model_choice = st.sidebar.selectbox("Choose a Model", ["CatBoost", "XGBoost", "Stacked Model"])
+# App title
+st.title("📊 Product Demand Forecasting App")
+st.markdown("Predict product **sales** based on store details, promotions, oil price, holidays, and more.")
 
-model_path = {
-    "CatBoost": "model/CAT_model.pkl",
-    "XGBoost": "model/XGB_model.pkl",
-    "Stacked Model": "model/BEST_STACKED_MODEL_OPTUNA.pkl"
-}
+# Sidebar input
+st.sidebar.header("Input Features")
 
-try:
-    model = pickle.load(open(model_path[model_choice], "rb"))
-except FileNotFoundError:
-    st.error(f"❌ {model_choice} model file not found at `{model_path[model_choice]}`.")
-    st.stop()
+# Example: Input fields (expand based on your dataset)
+store_nbr = st.sidebar.number_input("Store Number", min_value=1, max_value=100, value=1)
+onpromotion = st.sidebar.number_input("Items on Promotion", min_value=0)
+cluster = st.sidebar.number_input("Cluster", min_value=0, max_value=50, value=13)
+transactions = st.sidebar.number_input("Transactions", min_value=0)
+dcoilwtico = st.sidebar.number_input("Oil Price", min_value=0.0)
+year = st.sidebar.selectbox("Year", [2013, 2014, 2015, 2016])
+month = st.sidebar.selectbox("Month", list(range(1, 13)))
+day = st.sidebar.selectbox("Day", list(range(1, 32)))
 
-# -- TAB UI --
-tab1, tab2 = st.tabs(["📁 Upload CSV", "🖊️ Manual Entry"])
+# Placeholder for one-hot encoded categorical inputs
+# In production, ensure these match your training pipeline!
+family_AUTOMOTIVE = st.sidebar.selectbox("Product Family: AUTOMOTIVE", [0.0, 1.0])
 
-# === 📁 FILE UPLOAD MODE ===
-with tab1:
-    st.markdown("### Upload your product data (CSV):")
-    uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+# You can expand with more dropdowns or checkboxes as needed...
 
-    if uploaded_file:
-        try:
-            input_df = pd.read_csv(uploaded_file)
-            st.subheader("📋 Raw Input")
-            st.dataframe(input_df.head())
+# Create input DataFrame
+input_data = pd.DataFrame({
+    'store_nbr': [store_nbr],
+    'onpromotion': [onpromotion],
+    'cluster': [cluster],
+    'transactions': [transactions],
+    'dcoilwtico': [dcoilwtico],
+    'year': [year],
+    'month': [month],
+    'day': [day],
+    'family_AUTOMOTIVE': [family_AUTOMOTIVE],
+    # Add remaining one-hot encoded or numerical columns
+    # Must match your training data format exactly!
+})
 
-            processed_df = preprocess_input(input_df)
-            st.subheader("⚙️ Preprocessed Input")
-            st.dataframe(processed_df.head())
+# Prediction
+if st.button("Predict Demand"):
+    prediction = model.predict(input_data)[0]
+    st.success(f"📦 Predicted Sales: {prediction:.2f} units")
 
-            predictions = model.predict(processed_df)
-            input_df['Predicted Sales'] = predictions
+    # Optional: Visual feedback
+    st.metric("Expected Sales", f"{prediction:.2f} units", help="Forecasted demand based on your input")
 
-            st.subheader("🔮 Predictions")
-            st.dataframe(input_df[['Predicted Sales']].head())
-
-            # Download CSV
-            csv = input_df.to_csv(index=False).encode('utf-8')
-            st.download_button("⬇️ Download Predictions", csv, "predicted_output.csv", "text/csv")
-
-        except Exception as e:
-            st.error(f"⚠️ Error processing file: {e}")
-
-# === 🖊️ MANUAL INPUT MODE ===
-with tab2:
-    st.markdown("### Manually enter product features:")
-
-    date = st.date_input("Date")
-    family = st.selectbox("Product Family", ['BEVERAGES', 'GROCERY I', 'DAIRY', 'SEAFOOD', 'HOME AND KITCHEN I'])
-    city = st.selectbox("City", ['QUITO', 'CUENCA', 'GUAYAQUIL', 'AMBATO'])
-    holiday_type = st.selectbox("Holiday Type", ['Holiday', 'Additional', 'Event', 'Work Day', 'Transfer'])
-    transactions = st.number_input("Number of Transactions", min_value=0, step=1)
-    oil_price = st.number_input("Oil Price (dcoilwtico)", min_value=0.0, step=0.1)
-
-    if st.button("🚀 Predict Sales"):
-        try:
-            input_dict = {
-                'id': [1],
-                'date': [pd.to_datetime(date)],
-                'family': [family],
-                'city': [city],
-                'holiday_type': [holiday_type],
-                'transactions': [transactions],
-                'dcoilwtico': [oil_price]
-            }
-            input_df = pd.DataFrame(input_dict)
-
-            st.subheader("🔍 Input Summary")
-            st.dataframe(input_df)
-
-            processed_df = preprocess_input(input_df)
-            prediction = model.predict(processed_df)[0]
-
-            st.success(f"📊 Predicted Sales ({model_choice}): **{prediction:.2f}** units")
-
-        except Exception as e:
-            st.error(f"⚠️ Prediction failed: {e}")
