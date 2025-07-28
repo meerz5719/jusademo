@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 
 # Load the trained stacked model
-with open("best_stacked_model_optuna1.pkl", "rb") as f:
+with open("best_STACKED_MODEL.pkl", "rb") as f:
     model = pickle.load(f)
 
 # App title
