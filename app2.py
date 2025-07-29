@@ -2,14 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-import xgboost as xgb
 
-# Load model
+# Load trained XGBRegressor model
 model = joblib.load("XGB_model.pkl")
 
-# Model expected features (from model.get_booster().feature_names)
+# Features model was trained on (use model.get_booster().feature_names if needed)
 expected_features = [
     'store_nbr', 'onpromotion', 'cluster', 'transactions', 'year', 'month', 'day',
     'family_AUTOMOTIVE', 'family_BEAUTY', 'family_CELEBRATION', 'family_CLEANING', 'family_CLOTHING',
@@ -23,13 +22,18 @@ expected_features = [
     'holiday_type_Holiday', 'holiday_type_Transfer', 'holiday_type_Work Day'
 ]
 
-# Sidebar Inputs
+# Set page title
+st.set_page_config(page_title="Product Demand Forecasting", layout="centered")
+st.title("📦 Product Demand Forecasting App")
+
 st.sidebar.header("🧾 Input Parameters")
+
+# Sidebar inputs
 store_nbr = st.sidebar.selectbox("Store Number", list(range(1, 55)))
-date_input = st.sidebar.date_input("Date", value=datetime.today())
-onpromotion = st.sidebar.selectbox("Is On Promotion?", [0, 1])
+date_input = st.sidebar.date_input("Select Date", value=datetime.today())
+onpromotion = st.sidebar.selectbox("Is Promotion Active?", [0, 1])
 transactions = st.sidebar.number_input("Transactions", min_value=0, value=1000)
-cluster = st.sidebar.selectbox("Cluster", list(range(1, 18)))  # if you know your cluster range
+cluster = st.sidebar.selectbox("Cluster", list(range(1, 18)))
 family = st.sidebar.selectbox("Product Family", [
     "AUTOMOTIVE", "BEAUTY", "CELEBRATION", "CLEANING", "CLOTHING", "FOODS",
     "GROCERY", "HARDWARE", "HOME", "LADIESWEAR", "LAWN AND GARDEN", "LIQUOR,WINE,BEER",
@@ -44,50 +48,56 @@ holiday_type = st.sidebar.selectbox("Holiday Type", [
     "Additional", "Bridge", "Event", "Holiday", "Transfer", "Work Day"
 ])
 
-# Build base input
-input_df = pd.DataFrame({
-    "store_nbr": [store_nbr],
-    "onpromotion": [onpromotion],
-    "transactions": [transactions],
-    "cluster": [cluster],
-    "date": [pd.to_datetime(date_input)],
-    "family": [family],
-    "city": [city],
-    "holiday_type": [holiday_type]
-})
+# Build input dataframe
+def create_input_df(selected_date):
+    df = pd.DataFrame({
+        "store_nbr": [store_nbr],
+        "onpromotion": [onpromotion],
+        "transactions": [transactions],
+        "cluster": [cluster],
+        "date": [pd.to_datetime(selected_date)],
+        "family": [family],
+        "city": [city],
+        "holiday_type": [holiday_type]
+    })
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.month
+    df["day"] = df["date"].dt.day
+    df.drop(columns=["date"], inplace=True)
 
-# Extract time features
-input_df["year"] = input_df["date"].dt.year
-input_df["month"] = input_df["date"].dt.month
-input_df["day"] = input_df["date"].dt.day
-input_df.drop(columns=["date"], inplace=True)
+    # One-hot encode
+    df = pd.get_dummies(df, columns=["family", "city", "holiday_type"], prefix=["family", "city", "holiday_type"])
 
-# One-hot encode categorical features
-input_df = pd.get_dummies(input_df, columns=["family", "city", "holiday_type"], prefix=["family", "city", "holiday_type"])
+    # Add missing columns (set to 0)
+    for col in expected_features:
+        if col not in df.columns:
+            df[col] = 0
 
-# ✅ Add missing one-hot columns with 0s
-for col in expected_features:
-    if col not in input_df.columns:
-        input_df[col] = 0
+    # Reorder
+    df = df[expected_features]
+    df = df.astype(np.float32)
 
-# ✅ Ensure correct column order
-input_df = input_df[expected_features]
+    return df
 
-# Final safety check: ensure input has correct features
-missing = [col for col in expected_features if col not in input_df.columns]
-if missing:
-    st.error(f"❌ Missing features: {missing}")
-else:
-    input_df = input_df[expected_features]  # enforce correct order
-    input_df = input_df.astype(np.float32)  # XGBoost prefers float32
-    dmatrix = xgb.DMatrix(input_df)
-    
-    prediction = model.predict(dmatrix)[0]
+# Predict for selected date
+if st.button("🔮 Predict Demand for Selected Date"):
+    input_df = create_input_df(date_input)
+    prediction = model.predict(input_df)[0]
     st.success(f"📈 Predicted Demand: **{round(prediction)} units**")
 
+    # Forecast next 10 days
+    st.subheader("📊 10-Day Demand Forecast")
+    future_dates = pd.date_range(start=date_input, periods=10)
+    forecast_data = []
 
-# Predict button
-if st.button("🔮 Predict Demand"):
-    dmatrix = xgb.DMatrix(input_df)  # Convert your input DataFrame
-    prediction = model.predict(dmatrix)[0]
-    st.success(f"📈 Predicted Demand: **{round(prediction)} units**")
+    for dt in future_dates:
+        row = create_input_df(dt)
+        pred = model.predict(row)[0]
+        forecast_data.append((dt, round(pred)))
+
+    forecast_df = pd.DataFrame(forecast_data, columns=["Date", "Forecasted Demand"])
+    st.line_chart(forecast_df.set_index("Date"))
+
+    # Download button
+    csv = forecast_df.to_csv(index=False).encode("utf-8")
+    st.download_button("📥 Download Forecast CSV", data=csv, file_name="forecast.csv", mime="text/csv")
