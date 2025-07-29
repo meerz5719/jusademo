@@ -4,6 +4,7 @@ import numpy as np
 import joblib
 from datetime import datetime
 import matplotlib.pyplot as plt
+import xgboost as xgb
 
 # Load model
 model = joblib.load("XGB_model.pkl")
@@ -86,10 +87,6 @@ else:
 
 
 # Predict button
-import xgboost as xgb
-
-
-
 if st.button("🔮 Predict Demand"):
     dmatrix = xgb.DMatrix(input_df)  # Convert your input DataFrame
     prediction = model.predict(dmatrix)[0]
