@@ -1,55 +1,63 @@
 import streamlit as st
+import pickle
 import pandas as pd
 import numpy as np
-import pickle
 
-# Load the trained stacked model
-with open("best_STACKED_MODEL.pkl", "rb") as f:
+# Load the trained XGBoost model
+with open("XGB_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# App title
-st.title("📊 Product Demand Forecasting App")
-st.markdown("Predict product **sales** based on store details, promotions, oil price, holidays, and more.")
+# Load the saved feature names used during training
+with open("model_features.pkl", "rb") as f:
+    feature_names = pickle.load(f)
 
-# Sidebar input
-st.sidebar.header("Input Features")
+# Set Streamlit app title
+st.title("📊 Product Demand Forecasting")
+st.markdown("Enter the details below to predict future sales.")
 
-# Example: Input fields (expand based on your dataset)
-store_nbr = st.sidebar.number_input("Store Number", min_value=1, max_value=100, value=1)
-onpromotion = st.sidebar.number_input("Items on Promotion", min_value=0)
-cluster = st.sidebar.number_input("Cluster", min_value=0, max_value=50, value=13)
-transactions = st.sidebar.number_input("Transactions", min_value=0)
-dcoilwtico = st.sidebar.number_input("Oil Price", min_value=0.0)
-year = st.sidebar.selectbox("Year", [2013, 2014, 2015, 2016])
-month = st.sidebar.selectbox("Month", list(range(1, 13)))
-day = st.sidebar.selectbox("Day", list(range(1, 32)))
+# Input form
+with st.form("input_form"):
+    col1, col2 = st.columns(2)
 
-# Placeholder for one-hot encoded categorical inputs
-# In production, ensure these match your training pipeline!
-family_AUTOMOTIVE = st.sidebar.selectbox("Product Family: AUTOMOTIVE", [0.0, 1.0])
+    with col1:
+        store_nbr = st.number_input("Store Number", value=1, min_value=1)
+        onpromotion = st.number_input("Items on Promotion", value=0)
+        cluster = st.number_input("Cluster", value=1)
+        transactions = st.number_input("Transactions (scaled)", value=0.0)
+    
+    with col2:
+        dcoilwtico = st.number_input("Oil Price (scaled)", value=0.0)
+        year = st.number_input("Year", value=2017)
+        month = st.number_input("Month", value=1, min_value=1, max_value=12)
+        day = st.number_input("Day", value=1, min_value=1, max_value=31)
 
-# You can expand with more dropdowns or checkboxes as needed...
+    # Dummy example: manually entering one-hot columns (real use: dynamic or backend)
+    family_AUTOMOTIVE = st.checkbox("Is Family: AUTOMOTIVE?", value=True)
 
-# Create input DataFrame
-input_data = pd.DataFrame({
-    'store_nbr': [store_nbr],
-    'onpromotion': [onpromotion],
-    'cluster': [cluster],
-    'transactions': [transactions],
-    'dcoilwtico': [dcoilwtico],
-    'year': [year],
-    'month': [month],
-    'day': [day],
-    'family_AUTOMOTIVE': [family_AUTOMOTIVE],
-    # Add remaining one-hot encoded or numerical columns
-    # Must match your training data format exactly!
-})
+    submitted = st.form_submit_button("Predict Sales")
 
-# Prediction
-if st.button("Predict Demand"):
-    prediction = model.predict(input_data)[0]
-    st.success(f"📦 Predicted Sales: {prediction:.2f} units")
+if submitted:
+    # Create a base input dictionary with all features set to 0
+    input_dict = {col: 0 for col in feature_names}
 
-    # Optional: Visual feedback
-    st.metric("Expected Sales", f"{prediction:.2f} units", help="Forecasted demand based on your input")
+    # Update input_dict with user inputs
+    input_dict.update({
+        'store_nbr': store_nbr,
+        'onpromotion': onpromotion,
+        'cluster': cluster,
+        'transactions': transactions,
+        'dcoilwtico': dcoilwtico,
+        'year': year,
+        'month': month,
+        'day': day,
+        'family_AUTOMOTIVE': int(family_AUTOMOTIVE)
+    })
 
+    # Convert to DataFrame with correct column order
+    input_df = pd.DataFrame([input_dict])[feature_names]
+
+    try:
+        prediction = model.predict(input_df)[0]
+        st.success(f"📦 Predicted Sales: {prediction:.2f} units")
+    except Exception as e:
+        st.error(f"Prediction failed: {str(e)}")
