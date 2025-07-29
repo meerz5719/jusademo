@@ -8,7 +8,7 @@ with open('XGB_model.pkl', 'rb') as f:
     model = pickle.load(f)
 
 # Load column names used in training
-with open('xgb_features.pkl', 'rb') as f:
+with open('XGB_model.pkl', 'rb') as f:
     feature_names = pickle.load(f)
 
 st.title("🧮 Product Demand Forecast App (XGBoost)")
