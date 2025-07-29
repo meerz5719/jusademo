@@ -6,7 +6,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 # Load the stacked model
-model = joblib.load("best_stacked_model_optuna1.pkl")
+model = joblib.load("XGB_model.pkl")
 
 # Title
 st.title("📦 Product Demand Forecasting App")
