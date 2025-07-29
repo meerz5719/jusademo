@@ -72,7 +72,25 @@ for col in expected_features:
 # ✅ Ensure correct column order
 input_df = input_df[expected_features]
 
+# Final safety check: ensure input has correct features
+missing = [col for col in expected_features if col not in input_df.columns]
+if missing:
+    st.error(f"❌ Missing features: {missing}")
+else:
+    input_df = input_df[expected_features]  # enforce correct order
+    input_df = input_df.astype(np.float32)  # XGBoost prefers float32
+    dmatrix = xgb.DMatrix(input_df)
+    
+    prediction = model.predict(dmatrix)[0]
+    st.success(f"📈 Predicted Demand: **{round(prediction)} units**")
+
+
 # Predict button
+import xgboost as xgb
+
+
+
 if st.button("🔮 Predict Demand"):
-    prediction = model.predict(input_df)[0]
+    dmatrix = xgb.DMatrix(input_df)  # Convert your input DataFrame
+    prediction = model.predict(dmatrix)[0]
     st.success(f"📈 Predicted Demand: **{round(prediction)} units**")
