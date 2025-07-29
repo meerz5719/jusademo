@@ -1,63 +1,44 @@
 import streamlit as st
-import pickle
 import pandas as pd
 import numpy as np
+import pickle
 
-# Load the trained XGBoost model
-with open("XGB_model.pkl", "rb") as f:
+# Load trained XGBoost model
+with open('XGB_model.pkl', 'rb') as f:
     model = pickle.load(f)
 
-# Load the saved feature names used during training
-with open("model_features.pkl", "rb") as f:
+# Load column names used in training
+with open('xgb_features.pkl', 'rb') as f:
     feature_names = pickle.load(f)
 
-# Set Streamlit app title
-st.title("📊 Product Demand Forecasting")
-st.markdown("Enter the details below to predict future sales.")
+st.title("🧮 Product Demand Forecast App (XGBoost)")
 
-# Input form
-with st.form("input_form"):
-    col1, col2 = st.columns(2)
+st.markdown("Enter the details below to forecast product demand:")
 
-    with col1:
-        store_nbr = st.number_input("Store Number", value=1, min_value=1)
-        onpromotion = st.number_input("Items on Promotion", value=0)
-        cluster = st.number_input("Cluster", value=1)
-        transactions = st.number_input("Transactions (scaled)", value=0.0)
+# Create input form
+input_data = {}
+for feature in feature_names:
+    if 'family_' in feature or 'city_' in feature or 'holiday_type_' in feature:
+        input_data[feature] = st.selectbox(f"{feature}", [0.0, 1.0])
+    elif feature in ['store_nbr', 'cluster', 'month', 'day', 'year']:
+        input_data[feature] = st.number_input(f"{feature}", value=1, step=1)
+    else:
+        input_data[feature] = st.number_input(f"{feature}", value=0.0, format="%.6f")
+
+# Submit button
+if st.button("Predict Demand"):
+    # Construct input DataFrame
+    user_input_df = pd.DataFrame([input_data])
     
-    with col2:
-        dcoilwtico = st.number_input("Oil Price (scaled)", value=0.0)
-        year = st.number_input("Year", value=2017)
-        month = st.number_input("Month", value=1, min_value=1, max_value=12)
-        day = st.number_input("Day", value=1, min_value=1, max_value=31)
+    # Ensure correct order of columns
+    user_input_df = user_input_df[feature_names]
 
-    # Dummy example: manually entering one-hot columns (real use: dynamic or backend)
-    family_AUTOMOTIVE = st.checkbox("Is Family: AUTOMOTIVE?", value=True)
+    # Predict
+    prediction = model.predict(user_input_df)[0]
 
-    submitted = st.form_submit_button("Predict Sales")
+    st.success(f"📦 Predicted Sales (standardized): {prediction:.4f}")
 
-if submitted:
-    # Create a base input dictionary with all features set to 0
-    input_dict = {col: 0 for col in feature_names}
-
-    # Update input_dict with user inputs
-    input_dict.update({
-        'store_nbr': store_nbr,
-        'onpromotion': onpromotion,
-        'cluster': cluster,
-        'transactions': transactions,
-        'dcoilwtico': dcoilwtico,
-        'year': year,
-        'month': month,
-        'day': day,
-        'family_AUTOMOTIVE': int(family_AUTOMOTIVE)
-    })
-
-    # Convert to DataFrame with correct column order
-    input_df = pd.DataFrame([input_dict])[feature_names]
-
-    try:
-        prediction = model.predict(input_df)[0]
-        st.success(f"📦 Predicted Sales: {prediction:.2f} units")
-    except Exception as e:
-        st.error(f"Prediction failed: {str(e)}")
+    # If you had used inverse scaling or log transform during training:
+    # e.g., if you applied log1p transform during training:
+    # final_prediction = np.expm1(prediction)
+    # st.success(f"📦 Predicted Sales (original scale): {final_prediction:.2f} units")
