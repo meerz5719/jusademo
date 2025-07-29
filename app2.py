@@ -37,7 +37,7 @@ input_df["dayofweek"] = input_df["date"].dt.dayofweek
 input_df.drop(columns=["date"], inplace=True)
 
 # ✅ Ensure feature order matches what model expects
-expected_features = ['store_nbr', 'promo', 'transactions', 'year', 'month', 'day', 'dayofweek']
+expected_features = ['store_nbr', 'onpromotion', 'cluster', 'transactions', 'year', 'month', 'day', 'family_AUTOMOTIVE', 'family_BEAUTY', 'family_CELEBRATION', 'family_CLEANING', 'family_CLOTHING', 'family_FOODS', 'family_GROCERY', 'family_HARDWARE', 'family_HOME', 'family_LADIESWEAR', 'family_LAWN AND GARDEN', 'family_LIQUOR,WINE,BEER', 'family_PET SUPPLIES', 'family_STATIONERY', 'city_Ambato', 'city_Babahoyo', 'city_Cayambe', 'city_Cuenca', 'city_Daule', 'city_El Carmen', 'city_Esmeraldas', 'city_Guaranda', 'city_Guayaquil', 'city_Ibarra', 'city_Latacunga', 'city_Libertad', 'city_Loja', 'city_Machala', 'city_Manta', 'city_Playas', 'city_Puyo', 'city_Quevedo', 'city_Quito', 'city_Riobamba', 'city_Salinas', 'city_Santo Domingo', 'holiday_type_Additional', 'holiday_type_Bridge', 'holiday_type_Event', 'holiday_type_Holiday', 'holiday_type_Transfer', 'holiday_type_Work Day']
 
 # Safety check
 missing = [f for f in expected_features if f not in input_df.columns]
